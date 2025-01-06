@@ -7,6 +7,8 @@ import org.springframework.boot.autoconfigure.security.SecurityProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.ProviderManager;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -46,7 +48,10 @@ public class SecurityConfig {
                     }
                 }))
                 .csrf(AbstractHttpConfigurer::disable)
-                .authorizeHttpRequests((requests) -> requests.anyRequest().authenticated())
+                .authorizeHttpRequests((requests) -> requests
+                        .requestMatchers("/v1/user/apiLogin").permitAll()
+                        .requestMatchers("/v1/user/user").authenticated()
+                        .requestMatchers("/v1/user/getAll").authenticated())
                 .addFilterBefore(new JWTTokenValidatorFilter(), BasicAuthenticationFilter.class)
                 .addFilterAfter(new JWTTokenGeneratorFilter(), BasicAuthenticationFilter.class);
         http.formLogin(withDefaults());
@@ -71,5 +76,18 @@ public class SecurityConfig {
     @Bean
     public PasswordEncoder passwordEncoder() {
         return PasswordEncoderFactories.createDelegatingPasswordEncoder();
+    }
+
+    @Bean
+    public AuthenticationManager authenticationManager(UserDetailsService userDetailsService, PasswordEncoder passwordEncoder) {
+        PTProjectUsernamePwdAuthenticationProvider authenticationProvider =
+                new PTProjectUsernamePwdAuthenticationProvider(userDetailsService, passwordEncoder);
+
+        ProviderManager providerManager = new ProviderManager(authenticationProvider);
+
+        // The ProviderManager not going to arase the password inside the authentication object
+        // this going to give some flexibility
+        providerManager.setEraseCredentialsAfterAuthentication(false);
+        return providerManager;
     }
 }
